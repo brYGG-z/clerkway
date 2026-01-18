@@ -1,6 +1,6 @@
 [project]
 name = "clerkway"
-version = "0.1.0"
+version = "0.1.1"
 description = "Clerk authentication proxy for custom domains (ngrok, tunnels, etc.)"
 readme = "README.md"
 license = { text = "MIT" }
