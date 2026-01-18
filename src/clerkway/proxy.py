@@ -24,7 +24,9 @@ Usage:
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from typing import AsyncIterator
 
 import httpx
 from fastapi import APIRouter, Request, Response
@@ -88,6 +90,42 @@ def _get_domain(request: Request) -> str:
     """Get the domain from the request for cookie rewriting."""
     host = request.headers.get("x-forwarded-host", request.headers.get("host", ""))
     return host.split(":")[0]  # Remove port if present
+
+
+# Module-level client for connection reuse
+_http_client: httpx.AsyncClient | None = None
+
+
+async def _get_http_client(timeout: float) -> httpx.AsyncClient:
+    """Get or create the shared httpx client."""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=timeout, follow_redirects=False)
+    return _http_client
+
+
+async def close_http_client() -> None:
+    """Close the shared httpx client. Call this on app shutdown."""
+    global _http_client
+    if _http_client is not None and not _http_client.is_closed:
+        await _http_client.aclose()
+        _http_client = None
+
+
+@asynccontextmanager
+async def clerk_proxy_lifespan(app) -> AsyncIterator[None]:
+    """Lifespan context manager for proper client cleanup.
+    
+    Usage:
+        ```python
+        from fastapi import FastAPI
+        from clerkway import clerk_proxy_lifespan
+        
+        app = FastAPI(lifespan=clerk_proxy_lifespan)
+        ```
+    """
+    yield
+    await close_http_client()
 
 
 def create_clerk_proxy_router(config: ClerkProxyConfig) -> APIRouter:
@@ -160,14 +198,20 @@ def create_clerk_proxy_router(config: ClerkProxyConfig) -> APIRouter:
                 headers["Origin"] = f"https://{our_host}"
 
         # Make proxied request - disable redirects to rewrite Location headers
-        async with httpx.AsyncClient(
-            timeout=config.timeout, follow_redirects=False
-        ) as client:
+        try:
+            client = await _get_http_client(config.timeout)
             response = await client.request(
                 method=request.method,
                 url=target_url,
                 headers=headers,
                 content=body,
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Clerk proxy request failed: {e}")
+            return Response(
+                status_code=502,
+                content=f"Proxy error: unable to reach Clerk API",
+                media_type="text/plain",
             )
 
         # Log OAuth callback response

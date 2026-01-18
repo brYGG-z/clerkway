@@ -6,7 +6,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [
-    { name = "Your Name", email = "you@example.com" }
+    { name = "brYGG-z" }
 ]
 keywords = ["clerk", "ngrok", "authentication", "proxy", "oauth"]
 classifiers = [
@@ -36,9 +36,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourorg/clerkway"
-Documentation = "https://github.com/yourorg/clerkway#readme"
-Repository = "https://github.com/yourorg/clerkway"
+Homepage = "https://github.com/brYGG-z/clerkway"
+Documentation = "https://github.com/brYGG-z/clerkway#readme"
+Repository = "https://github.com/brYGG-z/clerkway"
 
 [build-system]
 requires = ["hatchling"]
